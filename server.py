@@ -157,8 +157,8 @@ async def on_shutdown(app):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='WebRTC audio / video / data-channels demo')
-    parser.add_argument('--port', type=int, default=9090,
-                        help='Port for HTTP server (default: 9090)')
+    parser.add_argument('--port', type=int, default=8090,
+                        help='Port for HTTP server (default: 8090)')
     parser.add_argument('--verbose', '-v', action='count')
     args = parser.parse_args()
 
@@ -170,4 +170,4 @@ if __name__ == '__main__':
     app.router.add_get('/', index)
     app.router.add_get('/client.js', javascript)
     app.router.add_post('/offer', offer)
-    web.run_app(app, port=args.port)
+    web.run_app(app, port=args.port, host='127.0.0.1')
