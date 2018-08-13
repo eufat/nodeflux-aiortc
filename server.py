@@ -8,29 +8,31 @@ import wave
 import cv2
 from aiohttp import web
 
-from aiortc import (RTCPeerConnection, RTCSessionDescription)
+from aiortc import (RTCPeerConnection, RTCSessionDescription, VideoFrame,
+                    VideoStreamTrack)
+from aiortc.contrib.media import (AudioFileTrack, VideoFileTrack,
+                                  frame_from_bgr, frame_from_gray,
+                                  frame_to_bgr)
 
 ROOT = os.path.dirname(__file__)
 
-vcap = cv2.VideoCapture("rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov")
+rtsp_path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov"
 
 
-class VideoTransformTrack():
-    def __init__(self):
-        self.received = asyncio.Queue(maxsize=1)
-
-    async def recv(self):
-        frame = await self.received.get()
-
-        return frame
-
-
-async def consume_video(local_video):
+async def consume_video(track, local_video):
     """
     Drain incoming video, and echo it back.
     """
+    last_size = None
+
     while True:
-        ret, frame = vcap.read()
+        frame = await track.recv()
+
+        # print frame size
+        frame_size = (frame.width, frame.height)
+        if frame_size != last_size:
+            print('Received frame size', frame_size)
+            last_size = frame_size
 
         # we are only interested in the latest frame
         if local_video.received.full():
@@ -53,7 +55,7 @@ async def offer(request):
     params = await request.json()
     offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
 
-    local_video = VideoTransformTrack()
+    local_video = VideoFileTrack(rtsp_path)
 
     pc = RTCPeerConnection()
     pc._consumers = []
@@ -65,8 +67,12 @@ async def offer(request):
         def on_message(message):
             channel.send('pong')
 
-    pc.addTrack(local_video)
-    pc._consumers.append(asyncio.ensure_future(consume_video(local_video)))
+    @pc.on('track')
+    def on_track(track):
+        if track.kind == 'video':
+            pc.addTrack(local_video)
+            pc._consumers.append(
+                asyncio.ensure_future(consume_video(track, local_video)))
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
