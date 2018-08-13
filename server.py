@@ -8,75 +8,29 @@ import wave
 import cv2
 from aiohttp import web
 
-from aiortc import (RTCPeerConnection, RTCSessionDescription, VideoFrame,
-                    VideoStreamTrack)
-from aiortc.contrib.media import (AudioFileTrack, frame_from_bgr,
-                                  frame_from_gray, frame_to_bgr)
+from aiortc import (RTCPeerConnection, RTCSessionDescription)
 
 ROOT = os.path.dirname(__file__)
-AUDIO_OUTPUT_PATH = os.path.join(ROOT, 'output.wav')
+
+vcap = cv2.VideoCapture("rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov")
 
 
-vcap = cv2.VideoCapture("rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov");
-
-# class VideoTransformTrack():
-#     def __init__(self):
-#         self.received = asyncio.Queue(maxsize=1)
-
-#     async def recv(self):
-#         # frame = await self.received.get()
-#         ret, frame = vcap.read()
-
-#         return frame
-
-class VideoFromRTSP():
-    kind = 'video'
-
+class VideoTransformTrack():
     def __init__(self):
-        self.counter = 0
         self.received = asyncio.Queue(maxsize=1)
 
     async def recv(self):
         frame = await self.received.get()
 
-        ret, frame = vcap.read()
-        # return raw frame
         return frame
-
-async def consume_audio(track):
-    """
-    Drain incoming audio and write it to a file.
-    """
-    writer = None
-
-    try:
-        while True:
-            frame = await track.recv()
-            if writer is None:
-                writer = wave.open(AUDIO_OUTPUT_PATH, 'wb')
-                writer.setnchannels(frame.channels)
-                writer.setframerate(frame.sample_rate)
-                writer.setsampwidth(frame.sample_width)
-            writer.writeframes(frame.data)
-    finally:
-        if writer is not None:
-            writer.close()
 
 
 async def consume_video(local_video):
     """
     Drain incoming video, and echo it back.
     """
-    last_size = None
-
     while True:
-        frame = await track.recv()
-
-        # print frame size
-        frame_size = (frame.width, frame.height)
-        if frame_size != last_size:
-            print('Received frame size', frame_size)
-            last_size = frame_size
+        ret, frame = vcap.read()
 
         # we are only interested in the latest frame
         if local_video.received.full():
@@ -97,17 +51,13 @@ async def javascript(request):
 
 async def offer(request):
     params = await request.json()
-    offer = RTCSessionDescription(
-        sdp=params['sdp'],
-        type=params['type'])
+    offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
+
+    local_video = VideoTransformTrack()
 
     pc = RTCPeerConnection()
     pc._consumers = []
     pcs.append(pc)
-
-    # prepare local media
-    local_audio = AudioFileTrack(path=os.path.join(ROOT, 'demo-instruct.wav'))
-    local_video = VideoFromRTSP()
 
     @pc.on('datachannel')
     def on_datachannel(channel):
@@ -115,23 +65,12 @@ async def offer(request):
         def on_message(message):
             channel.send('pong')
 
+    pc.addTrack(local_video)
+    pc._consumers.append(asyncio.ensure_future(consume_video(local_video)))
+
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
-
-    """
-    @pc.on('track')
-    def on_track(track):
-        if track.kind == 'audio':
-            pc.addTrack(local_audio)
-            pc._consumers.append(asyncio.ensure_future(consume_audio(track)))
-        elif track.kind == 'video':
-            pc.addTrack(local_video);
-            pc._consumers.append(asyncio.ensure_future(consume_video(local_video)))
-    """
-
-    pc.addTrack(local_video);
-    pc._consumers.append(asyncio.ensure_future(consume_video(local_video)))
 
     return web.Response(
         content_type='application/json',
@@ -156,9 +95,13 @@ async def on_shutdown(app):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='WebRTC audio / video / data-channels demo')
-    parser.add_argument('--port', type=int, default=8090,
-                        help='Port for HTTP server (default: 8090)')
+    parser = argparse.ArgumentParser(
+        description='WebRTC audio / video / data-channels demo')
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=8080,
+        help='Port for HTTP server (default: 8080)')
     parser.add_argument('--verbose', '-v', action='count')
     args = parser.parse_args()
 
