@@ -34,7 +34,6 @@ pc.addEventListener(
 );
 signalingLog.textContent = pc.signalingState;
 
-// connect audio / video
 pc.addEventListener("track", function(evt) {
     if (evt.track.kind == "video")
         document.getElementById("video").srcObject = evt.streams[0];
@@ -46,13 +45,15 @@ var dc = null,
     dcInterval = null;
 
 function negotiate() {
+    console.log("Negotiating ...");
     return pc
         .createOffer()
         .then(function(offer) {
+            console.log("Setting local description ...");
             return pc.setLocalDescription(offer);
         })
         .then(function() {
-            // wait for ICE gathering to complete
+            console.log("Waiting for ICE gathering to complete ...");
             return new Promise(function(resolve) {
                 if (pc.iceGatheringState === "complete") {
                     resolve();
@@ -71,14 +72,13 @@ function negotiate() {
             });
         })
         .then(function() {
+            console.log("Fetching offer ...");
             var offer = pc.localDescription;
             document.getElementById("offer-sdp").textContent = offer.sdp;
             return fetch("/offer", {
                 body: JSON.stringify({
                     sdp: offer.sdp,
-                    type: offer.type,
-                    video_transform: document.getElementById("video-transform")
-                        .value
+                    type: offer.type
                 }),
                 headers: {
                     "Content-Type": "application/json"
@@ -117,42 +117,32 @@ function start() {
         };
     }
 
-    var constraints = {
-        audio: document.getElementById("use-audio").checked,
-        video: false
-    };
+    constraints = { audio: false, video: false };
 
-    if (document.getElementById("use-video").checked) {
-        var resolution = document.getElementById("video-resolution").value;
-        if (resolution) {
-            resolution = resolution.split("x");
-            constraints.video = {
-                width: parseInt(resolution[0], 0),
-                height: parseInt(resolution[1], 0)
-            };
-        } else {
-            constraints.video = true;
-        }
-    }
+    /*
+    navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+        console.log("Stream specification")
+        console.log("typeof: ", typeof stream)
+        console.log("content: ", stream)
 
-    if (constraints.audio || constraints.video) {
-        if (constraints.video) {
-            document.getElementById("media").style.display = "block";
-        }
-        navigator.mediaDevices.getUserMedia(constraints).then(
-            function(stream) {
-                stream.getTracks().forEach(function(track) {
-                    pc.addTrack(track, stream);
-                });
-                return negotiate();
-            },
-            function(err) {
-                alert("Could not acquire media: " + err);
-            }
-        );
-    } else {
-        negotiate();
-    }
+        stream.getTracks().forEach(function(track) {
+            console.log("Track specification")
+            console.log("typeof: ", typeof track)
+            console.log("content: ", track)
+
+            pc.addTrack(track, stream);
+        });
+        return negotiate();
+    });
+    */
+
+    /*
+    const stream = new MediaStream();
+    const track = new MediaStreamTrack();
+    pc.addTrack(track, stream);
+    */
+
+    negotiate();
 
     document.getElementById("stop").style.display = "inline-block";
 }
