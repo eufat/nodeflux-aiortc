@@ -101,7 +101,6 @@ async def offer(request):
 
     def handler(signum, frame):
         roll_video()
-        sys.exit(1)
 
     # Call the roll video handler later, 5 sec. Using Signal.
     signal.signal(signal.SIGALRM, handler)
