@@ -21,6 +21,7 @@ from aiortc.contrib.media import (AudioFileTrack, VideoFileTrack,
 
 ROOT = os.path.dirname(__file__)
 
+# Example RTSP Path
 rtsp_path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov"
 
 
@@ -75,6 +76,7 @@ async def offer(request):
         def on_message(message):
             channel.send('pong')
     """
+    # Original addTrack handler, called when client send media stream
     @pc.on('track')
     def on_track(track):
         print("Video on track from client ...")
@@ -86,13 +88,12 @@ async def offer(request):
                 asyncio.ensure_future(consume_video(track, local_video)))
 
     """
+    # Roll video to client function
     def roll_video():
         print("Adding local track to client ...")
         pc.addTrack(local_video)
         print("Consuming local video ...")
         pc._consumers.append(asyncio.ensure_future(consume_video(local_video)))
-
-    # asyncio.set_event_loop(asyncio.new_event_loop())
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
@@ -102,18 +103,12 @@ async def offer(request):
         roll_video()
         sys.exit(1)
 
+    # Call the roll video handler later, 5 sec. Using Signal.
     signal.signal(signal.SIGALRM, handler)
-
-    # emit SIGALRM after 5 secs
-
     signal.setitimer(signal.ITIMER_REAL, 5)
-    # roll = Thread(
-    #     target=roll_video
-    # )
-    # roll.start()
 
+    # Call the roll video handler later, 5 sec. Using Timer
     # Timer(5.0, roll_video).start()
-    # roll_video()
 
     return web.Response(
         content_type='application/json',

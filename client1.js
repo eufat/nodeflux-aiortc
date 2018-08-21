@@ -117,7 +117,7 @@ function start() {
         };
     }
 
-    constraints = { audio: false, video: false };
+    // constraints = { audio: false, video: false };
 
     /*
     navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
