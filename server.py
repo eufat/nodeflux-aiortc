@@ -21,6 +21,11 @@ from aiortc.contrib.media import (AudioFileTrack, VideoFileTrack,
 
 ROOT = os.path.dirname(__file__)
 
+class VideoReadTrack(VideoFileTrack):
+    def __init__(self, path):
+        super().__init__(path)
+        self.received = asyncio.Queue(maxsize=1)
+
 # Example RTSP Path
 rtsp_path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov"
 
@@ -62,7 +67,7 @@ async def offer(request):
     params = await request.json()
     offer = RTCSessionDescription(sdp=params['sdp'], type=params['type'])
 
-    local_video = VideoFileTrack(rtsp_path)
+    local_video = VideoReadTrack(rtsp_path)
 
     pc = RTCPeerConnection()
     pc._consumers = []
