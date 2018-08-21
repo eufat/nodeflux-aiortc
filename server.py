@@ -8,6 +8,8 @@ import wave
 from threading import Timer
 from threading import Thread
 
+import signal, sys
+
 import cv2
 from aiohttp import web
 
@@ -19,7 +21,6 @@ from aiortc.contrib.media import (AudioFileTrack, VideoFileTrack,
 
 ROOT = os.path.dirname(__file__)
 
-# rtsp_path = "rtsp://admin:HuaWei123@10.7.1.65:554/LiveMedia/ch1/Media1"
 rtsp_path = "rtsp://184.72.239.149/vod/mp4:BigBuckBunny_175k.mov"
 
 
@@ -97,10 +98,19 @@ async def offer(request):
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
-    roll = Thread(
-        target=roll_video
-    )
-    roll.start()
+    def handler(signum, frame):
+        roll_video()
+        sys.exit(1)
+
+    signal.signal(signal.SIGALRM, handler)
+
+    # emit SIGALRM after 5 secs
+
+    signal.setitimer(signal.ITIMER_REAL, 5)
+    # roll = Thread(
+    #     target=roll_video
+    # )
+    # roll.start()
 
     # Timer(5.0, roll_video).start()
     # roll_video()
